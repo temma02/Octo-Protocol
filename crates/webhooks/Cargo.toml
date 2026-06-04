@@ -1,5 +1,5 @@
 [package]
-name = "blockme-webhooks"
+name = "octo-webhooks"
 description = "HMAC-SHA256 signed outbound webhooks with retry and a delivery log."
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-blockme-store.workspace = true
+octo-store.workspace = true
 reqwest.workspace = true
 hmac.workspace = true
 sha2.workspace = true

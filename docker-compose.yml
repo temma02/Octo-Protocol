@@ -1,17 +1,17 @@
 services:
   db:
     image: postgres:17-alpine
-    container_name: blockme-db
+    container_name: octo-db
     environment:
-      POSTGRES_USER: blockme
-      POSTGRES_PASSWORD: blockme
-      POSTGRES_DB: blockme
+      POSTGRES_USER: octo
+      POSTGRES_PASSWORD: octo
+      POSTGRES_DB: octo
     ports:
       - "5432:5432"
     volumes:
-      - blockme_pgdata:/var/lib/postgresql/data
+      - octo_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U blockme"]
+      test: ["CMD-SHELL", "pg_isready -U octo"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -19,7 +19,7 @@ services:
   # Optional DB UI — `docker compose up adminer` — http://localhost:8081
   adminer:
     image: adminer:latest
-    container_name: blockme-adminer
+    container_name: octo-adminer
     ports:
       - "8081:8080"
     depends_on:
@@ -27,4 +27,4 @@ services:
     profiles: ["tools"]
 
 volumes:
-  blockme_pgdata:
+  octo_pgdata:

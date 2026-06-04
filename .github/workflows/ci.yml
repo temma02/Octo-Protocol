@@ -17,18 +17,18 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: blockme
-          POSTGRES_PASSWORD: blockme
-          POSTGRES_DB: blockme
+          POSTGRES_USER: octo
+          POSTGRES_PASSWORD: octo
+          POSTGRES_DB: octo
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U blockme"
+          --health-cmd "pg_isready -U octo"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgres://blockme:blockme@localhost:5432/blockme
+      DATABASE_URL: postgres://octo:octo@localhost:5432/octo
       SQLX_OFFLINE: "true"
     steps:
       - uses: actions/checkout@v4

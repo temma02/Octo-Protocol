@@ -1,5 +1,5 @@
 [package]
-name = "blockme-store"
+name = "octo-store"
 description = "Postgres models and migrations (sqlx) for wallets, addresses, transactions, withdrawals, webhooks, and the ingest cursor."
 version.workspace = true
 edition.workspace = true

@@ -1,5 +1,5 @@
 [package]
-name = "blockme-ingest"
+name = "octo-ingest"
 description = "Horizon payment streaming with a durable cursor, attributing deposits by muxed id or memo id."
 version.workspace = true
 edition.workspace = true
@@ -9,8 +9,8 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-blockme-store.workspace = true
-blockme-webhooks.workspace = true
+octo-store.workspace = true
+octo-webhooks.workspace = true
 reqwest.workspace = true
 tokio.workspace = true
 serde.workspace = true

@@ -1,6 +1,6 @@
 # Reference material
 
-Source material used while designing blockme (Blockradar's master-wallet feature, which this
+Source material used while designing octo (Blockradar's master-wallet feature, which this
 project replicates Stellar-first). Not part of the build.
 
 - `docs.md` — links to Blockradar's docs (why-blockradar, security, API reference).

@@ -1,4 +1,4 @@
-# Contributing to blockme
+# Contributing to octo
 
 Thanks for your interest! This project is built incrementally and values correctness and
 security over speed (it handles crypto keys).

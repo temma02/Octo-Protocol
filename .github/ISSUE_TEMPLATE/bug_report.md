@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a problem with blockme
+about: Report a problem with octo
 title: "[bug] "
 labels: bug
 ---

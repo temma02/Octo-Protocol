@@ -1,5 +1,5 @@
 [package]
-name = "blockme-wallet-core"
+name = "octo-wallet-core"
 description = "SEP-0005 derivation, muxed address encode/decode, and transaction signing. The only crate that handles secret keys."
 version.workspace = true
 edition.workspace = true
@@ -9,7 +9,7 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-blockme-crypto.workspace = true
+octo-crypto.workspace = true
 stellar-strkey.workspace = true
 stellar-base.workspace = true
 slip10_ed25519.workspace = true

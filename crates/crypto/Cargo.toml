@@ -1,5 +1,5 @@
 [package]
-name = "blockme-crypto"
+name = "octo-crypto"
 description = "AES-256-GCM seal/open of the HD seed at rest."
 version.workspace = true
 edition.workspace = true

@@ -3,7 +3,7 @@
 ## The idea
 
 A **muxed account** (`M...`, [SEP-0023](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0023.md))
-is one real Stellar account (`G...`) plus a 64-bit **id** encoded into the address. blockme gives
+is one real Stellar account (`G...`) plus a 64-bit **id** encoded into the address. octo gives
 each customer their own `M...`. All customers' funds land in the **single** base account, and each
 payment record carries the id, so we attribute deposits without:
 
@@ -28,7 +28,7 @@ for "many users, one account" is **base `G...` + a numeric memo (id)**. Same inf
 encoding. Some senders — notably several centralized exchanges — still only accept a `G...`
 address plus a memo and cannot send to an `M...` string.
 
-So blockme exposes **both** forms of every customer address:
+So octo exposes **both** forms of every customer address:
 
 | Form | Use |
 |---|---|

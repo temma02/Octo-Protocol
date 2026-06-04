@@ -1,13 +1,13 @@
 # Security Policy
 
-blockme handles cryptographic seed material and signs blockchain transactions. We take security
+octo handles cryptographic seed material and signs blockchain transactions. We take security
 seriously and appreciate responsible disclosure.
 
 ## Reporting a vulnerability
 
 **Do not open a public GitHub issue for security reports.**
 
-Email **security@blockme.example** (replace with the real address) with:
+Email **security@octo.example** (replace with the real address) with:
 
 - a description of the issue and its impact,
 - steps to reproduce or a proof of concept,

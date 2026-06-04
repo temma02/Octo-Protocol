@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for blockme
+about: Suggest an idea for octo
 title: "[feat] "
 labels: enhancement
 ---

@@ -15,8 +15,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.84"
 license = "MIT"
-repository = "https://github.com/blockme/blockme"
-authors = ["blockme contributors"]
+repository = "https://github.com/octo/octo"
+authors = ["octo contributors"]
 
 # Shared, version-pinned dependencies (locked in Step 1 of the plan).
 # Crates opt in with `foo = { workspace = true }`.
@@ -57,12 +57,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = "0.8"
 
 # --- internal crates ---
-blockme-crypto = { path = "crates/crypto" }
-blockme-wallet-core = { path = "crates/wallet-core" }
-blockme-store = { path = "crates/store" }
-blockme-webhooks = { path = "crates/webhooks" }
-blockme-ingest = { path = "crates/ingest" }
-blockme-api = { path = "crates/api" }
+octo-crypto = { path = "crates/crypto" }
+octo-wallet-core = { path = "crates/wallet-core" }
+octo-store = { path = "crates/store" }
+octo-webhooks = { path = "crates/webhooks" }
+octo-ingest = { path = "crates/ingest" }
+octo-api = { path = "crates/api" }
 
 [profile.release]
 lto = "thin"

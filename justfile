@@ -1,4 +1,4 @@
-# blockme dev tasks — run `just <task>`. Install: cargo install just
+# octo dev tasks — run `just <task>`. Install: cargo install just
 set dotenv-load := true
 
 # List available tasks.
@@ -46,4 +46,4 @@ migrate:
 
 # Run the server.
 run:
-    cargo run -p blockme-server
+    cargo run -p octo-server

@@ -211,106 +211,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "blockme-api"
-version = "0.1.0"
-dependencies = [
- "axum",
- "blockme-crypto",
- "blockme-store",
- "blockme-wallet-core",
- "blockme-webhooks",
- "chrono",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "blockme-crypto"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "hex",
- "rand 0.8.6",
- "thiserror 1.0.69",
- "zeroize",
-]
-
-[[package]]
-name = "blockme-ingest"
-version = "0.1.0"
-dependencies = [
- "blockme-store",
- "blockme-webhooks",
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "blockme-server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blockme-api",
- "blockme-ingest",
- "blockme-store",
- "tokio",
-]
-
-[[package]]
-name = "blockme-store"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
-name = "blockme-wallet-core"
-version = "0.1.0"
-dependencies = [
- "blockme-crypto",
- "ed25519-dalek",
- "hex",
- "slip10_ed25519",
- "stellar-base",
- "stellar-strkey 0.0.16",
- "thiserror 1.0.69",
- "tiny-bip39",
- "zeroize",
-]
-
-[[package]]
-name = "blockme-webhooks"
-version = "0.1.0"
-dependencies = [
- "blockme-store",
- "hex",
- "hmac",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "borsh"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1413,6 +1313,106 @@ checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
  "libm",
+]
+
+[[package]]
+name = "octo-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "octo-crypto",
+ "octo-store",
+ "octo-wallet-core",
+ "octo-webhooks",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower",
+ "tower-http",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "octo-crypto"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "hex",
+ "rand 0.8.6",
+ "thiserror 1.0.69",
+ "zeroize",
+]
+
+[[package]]
+name = "octo-ingest"
+version = "0.1.0"
+dependencies = [
+ "octo-store",
+ "octo-webhooks",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "octo-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "octo-api",
+ "octo-ingest",
+ "octo-store",
+ "tokio",
+]
+
+[[package]]
+name = "octo-store"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "octo-wallet-core"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "hex",
+ "octo-crypto",
+ "slip10_ed25519",
+ "stellar-base",
+ "stellar-strkey 0.0.16",
+ "thiserror 1.0.69",
+ "tiny-bip39",
+ "zeroize",
+]
+
+[[package]]
+name = "octo-webhooks"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "hmac",
+ "octo-store",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

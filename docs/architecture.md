@@ -1,6 +1,6 @@
 # Architecture
 
-blockme is a Cargo workspace. The guiding rule: **secret material is confined to one crate**
+octo is a Cargo workspace. The guiding rule: **secret material is confined to one crate**
 (`wallet-core`), decrypted only in-memory at signing time, and zeroized immediately after.
 
 ## Crates

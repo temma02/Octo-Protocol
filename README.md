@@ -1,15 +1,15 @@
 <div align="center">
 
-# blockme
+# octo
 
 **Stellar-native master-wallet infrastructure** — Wallet-as-a-Service for stablecoins.
 
-[![CI](https://github.com/blockme/blockme/actions/workflows/ci.yml/badge.svg)](https://github.com/blockme/blockme/actions/workflows/ci.yml)
+[![CI](https://github.com/octo/octo/actions/workflows/ci.yml/badge.svg)](https://github.com/octo/octo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 </div>
 
-blockme lets a fintech manage stablecoin deposits on Stellar from a **single master wallet**:
+octo lets a fintech manage stablecoin deposits on Stellar from a **single master wallet**:
 generate a dedicated deposit address per customer, detect deposits in real time, and initiate
 withdrawals — all behind a REST API with signed webhooks, and a non-custodial key model.
 
@@ -17,7 +17,7 @@ It replicates the "master wallet" backbone of platforms like Blockradar, but bui
 
 ## Why this is simple on Stellar: muxed accounts
 
-Instead of deploying a funded on-chain account per customer (and sweeping funds back), blockme
+Instead of deploying a funded on-chain account per customer (and sweeping funds back), octo
 uses **muxed accounts** (`M...`): one real account (`G...`) plus a per-customer 64-bit id encoded
 into the address. Deposits to a customer's `M...` land directly in the master account and carry
 the id, so:
@@ -26,7 +26,7 @@ the id, so:
 - **no per-user XLM reserve** — only one account exists on-chain,
 - **generating an address is free and off-chain** — just assign the next id.
 
-For senders that don't yet accept `M...` (e.g. some exchanges), blockme also exposes the
+For senders that don't yet accept `M...` (e.g. some exchanges), octo also exposes the
 equivalent **`G...` + numeric memo** form, and attributes deposits by **muxed id _or_ memo id**.
 See [docs/deposit-model.md](docs/deposit-model.md).
 

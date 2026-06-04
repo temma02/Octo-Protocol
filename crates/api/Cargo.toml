@@ -1,5 +1,5 @@
 [package]
-name = "blockme-api"
+name = "octo-api"
 description = "axum REST API: wallets, addresses, withdrawals, transactions, webhooks."
 version.workspace = true
 edition.workspace = true
@@ -9,10 +9,10 @@ repository.workspace = true
 authors.workspace = true
 
 [dependencies]
-blockme-crypto.workspace = true
-blockme-wallet-core.workspace = true
-blockme-store.workspace = true
-blockme-webhooks.workspace = true
+octo-crypto.workspace = true
+octo-wallet-core.workspace = true
+octo-store.workspace = true
+octo-webhooks.workspace = true
 axum.workspace = true
 tower.workspace = true
 tower-http.workspace = true
