@@ -22,6 +22,9 @@ fmt-check:
     cargo fmt --all -- --check
 
 # Lint with clippy, warnings as errors.
+# NOTE: on toolchains built from a source tarball, clippy-driver rejects pre-compiled dependency
+# rmeta with E0514 ("compiled by an incompatible version of rustc") even though its version matches
+# rustc. If you hit that, it's the toolchain, not the code — clippy is enforced in CI instead.
 lint:
     cargo clippy --workspace --all-targets -- -D warnings
 
@@ -29,7 +32,10 @@ lint:
 deny:
     cargo deny check
 
-# Everything CI runs.
+# Local pre-push checks that work on every toolchain (clippy + deny run in CI).
+check: fmt-check test
+
+# Everything CI runs (may fail locally on source-tarball toolchains due to the clippy E0514 bug).
 ci: fmt-check lint test deny
 
 # Start local Postgres.
