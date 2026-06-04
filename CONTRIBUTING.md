@@ -27,6 +27,13 @@ cargo deny check   # licenses + advisories (cargo install cargo-deny)
 
 All of `fmt --check`, `clippy -D warnings`, and the test suite must pass.
 
+> **Note on local clippy:** some Rust toolchains built from a source tarball ship a
+> `clippy-driver` that rejects pre-compiled dependency metadata with `E0514` even though its
+> version matches `rustc`. If `cargo clippy` fails locally with "compiled by an incompatible
+> version of rustc" on third-party crates, that's the toolchain — not your code. Rely on CI's
+> clippy gate (which uses an official toolchain), and keep code clippy-clean by review. `cargo
+> build`/`test`/`fmt` are unaffected.
+
 ## Conventions
 
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`,

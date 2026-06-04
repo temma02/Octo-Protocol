@@ -1,0 +1,28 @@
+//! Error type for sealing/opening secrets.
+//!
+//! Variants are intentionally coarse and carry **no** plaintext, key bytes, or cryptographic
+//! detail — an attacker must not learn *why* a decryption failed (e.g. wrong key vs. tampered
+//! ciphertext vs. wrong context), only that it did. This avoids padding/MAC oracle style leaks.
+
+use thiserror::Error;
+
+/// Errors returned by [`crate::seal`] and [`crate::open`].
+#[derive(Debug, Error)]
+pub enum CryptoError {
+    /// The master key was not exactly 32 bytes (AES-256 requires a 256-bit key).
+    #[error("invalid master key length: expected 32 bytes")]
+    InvalidKeyLength,
+
+    /// A stored nonce was not the expected 12 bytes (corrupt record).
+    #[error("invalid nonce length: expected 12 bytes")]
+    InvalidNonceLength,
+
+    /// Authenticated decryption failed. This is returned for *any* failure to open —
+    /// wrong key, tampered ciphertext/nonce/tag, or mismatched AAD/context — on purpose.
+    #[error("decryption failed: ciphertext could not be authenticated")]
+    DecryptionFailed,
+
+    /// Authenticated encryption failed (should not happen for well-formed inputs).
+    #[error("encryption failed")]
+    EncryptionFailed,
+}

@@ -30,6 +30,7 @@ ed25519-dalek = "2.2.0"
 aes-gcm = "0.10.3"
 zeroize = { version = "1.8.2", features = ["derive"] }
 hmac = "0.12.1"
+hkdf = "0.12.4"
 sha2 = "0.10.9"
 hex = "0.4.3"
 # Note: the MSRV-aware resolver (.cargo/config.toml: incompatible-rust-versions = "fallback")

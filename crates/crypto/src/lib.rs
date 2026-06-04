@@ -1,8 +1,269 @@
 //! AES-256-GCM seal/open of the HD seed at rest.
 //!
-//! Implemented in Step 3 of the project plan.
+//! This crate is the at-rest encryption boundary for octo's secret material (the HD seed).
+//! It knows nothing about Stellar — it just authenticated-encrypts bytes under a 256-bit master
+//! key, with two hardening properties beyond plain AES-GCM:
+//!
+//! 1. **Per-record subkey derivation (HKDF-SHA256).** Each sealed record gets a fresh random
+//!    `salt`; the actual AES key is `HKDF(master_key, salt, info=context)`. This means the master
+//!    key is never used directly as the cipher key, every record uses a distinct key, and the
+//!    `context` (e.g. `"octo:mainnet"`) is bound into key derivation.
+//! 2. **AAD context binding.** The same `context` is also passed as AES-GCM associated data, so a
+//!    ciphertext sealed for one context cannot be opened under another even if salts collided.
+//!
+//! Plaintext and derived keys are wrapped in [`Zeroizing`] and wiped on drop. Errors are coarse
+//! and leak no cryptographic detail (see [`CryptoError`]).
 #![forbid(unsafe_code)]
 // Secret-handling crate: a panic could surface key material in a backtrace, and lossy/sign
-// conversions on amounts are bugs. Deny them.
+// conversions on amounts are bugs. Deny them (tests may unwrap freely).
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 #![deny(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+
+mod error;
+
+pub use error::CryptoError;
+
+use aes_gcm::aead::{Aead, KeyInit, OsRng, Payload};
+use aes_gcm::{Aes256Gcm, Key, Nonce};
+use hkdf::Hkdf;
+use rand::RngCore;
+use sha2::Sha256;
+use zeroize::Zeroizing;
+
+/// Length of the AES-256 master key, in bytes.
+pub const MASTER_KEY_LEN: usize = 32;
+/// Length of the AES-GCM nonce, in bytes (96 bits, the recommended size).
+pub const NONCE_LEN: usize = 12;
+/// Length of the per-record HKDF salt, in bytes.
+pub const SALT_LEN: usize = 32;
+
+/// A sealed secret: the AES-256-GCM ciphertext (including the authentication tag) plus the
+/// public, non-secret `nonce` and `salt` needed to open it.
+///
+/// None of these fields are secret, so deriving `Debug` is safe — but note that `open` *also*
+/// requires the original `context` and master key, neither of which is stored here.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SealedSeed {
+    /// AES-256-GCM ciphertext with the 16-byte GCM tag appended.
+    pub ciphertext: Vec<u8>,
+    /// Random 96-bit nonce used for this record.
+    pub nonce: [u8; NONCE_LEN],
+    /// Random salt used to derive this record's subkey via HKDF.
+    pub salt: [u8; SALT_LEN],
+}
+
+/// Derive a fresh per-record AES-256 key from the master key, salt, and context using HKDF-SHA256.
+///
+/// The returned key is zeroized on drop. Expansion to 32 bytes is always within HKDF-SHA256's
+/// output limit, so the only error path is structural and surfaces as [`CryptoError`] rather than
+/// a panic.
+fn derive_subkey(
+    master_key: &[u8; MASTER_KEY_LEN],
+    salt: &[u8; SALT_LEN],
+    context: &[u8],
+) -> Result<Zeroizing<[u8; 32]>, CryptoError> {
+    let hk = Hkdf::<Sha256>::new(Some(salt), master_key);
+    let mut okm = Zeroizing::new([0u8; 32]);
+    hk.expand(context, okm.as_mut())
+        .map_err(|_| CryptoError::EncryptionFailed)?;
+    Ok(okm)
+}
+
+/// Authenticated-encrypt `plaintext` under `master_key`, binding `context` into both the key
+/// derivation and the AEAD associated data.
+///
+/// `context` is a non-secret domain separator that must be supplied identically to [`open`]
+/// (e.g. `b"octo:mainnet"`). A fresh random nonce and salt are generated per call, so sealing the
+/// same plaintext twice yields different output.
+pub fn seal(
+    master_key: &[u8; MASTER_KEY_LEN],
+    plaintext: &[u8],
+    context: &[u8],
+) -> Result<SealedSeed, CryptoError> {
+    let mut salt = [0u8; SALT_LEN];
+    let mut nonce_bytes = [0u8; NONCE_LEN];
+    OsRng.fill_bytes(&mut salt);
+    OsRng.fill_bytes(&mut nonce_bytes);
+
+    let subkey = derive_subkey(master_key, &salt, context)?;
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(subkey.as_ref()));
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher
+        .encrypt(
+            nonce,
+            Payload {
+                msg: plaintext,
+                aad: context,
+            },
+        )
+        .map_err(|_| CryptoError::EncryptionFailed)?;
+
+    Ok(SealedSeed {
+        ciphertext,
+        nonce: nonce_bytes,
+        salt,
+    })
+}
+
+/// Authenticated-decrypt a [`SealedSeed`] produced by [`seal`].
+///
+/// Returns the plaintext wrapped in [`Zeroizing`] so it is wiped when dropped. Fails with
+/// [`CryptoError::DecryptionFailed`] for *any* authentication failure (wrong key, tampered
+/// ciphertext/nonce/tag, or a `context` that differs from the one used to seal) — the variant is
+/// deliberately indistinguishable across those cases.
+pub fn open(
+    master_key: &[u8; MASTER_KEY_LEN],
+    sealed: &SealedSeed,
+    context: &[u8],
+) -> Result<Zeroizing<Vec<u8>>, CryptoError> {
+    if sealed.nonce.len() != NONCE_LEN {
+        return Err(CryptoError::InvalidNonceLength);
+    }
+
+    let subkey = derive_subkey(master_key, &sealed.salt, context)?;
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(subkey.as_ref()));
+    let nonce = Nonce::from_slice(&sealed.nonce);
+
+    let plaintext = cipher
+        .decrypt(
+            nonce,
+            Payload {
+                msg: &sealed.ciphertext,
+                aad: context,
+            },
+        )
+        .map_err(|_| CryptoError::DecryptionFailed)?;
+
+    Ok(Zeroizing::new(plaintext))
+}
+
+/// Convenience: parse a 32-byte master key from a byte slice (e.g. decoded from a KMS/env value).
+pub fn master_key_from_slice(bytes: &[u8]) -> Result<[u8; MASTER_KEY_LEN], CryptoError> {
+    bytes.try_into().map_err(|_| CryptoError::InvalidKeyLength)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CTX: &[u8] = b"octo:testnet";
+
+    fn key() -> [u8; MASTER_KEY_LEN] {
+        let mut k = [0u8; MASTER_KEY_LEN];
+        OsRng.fill_bytes(&mut k);
+        k
+    }
+
+    #[test]
+    fn seal_open_roundtrip() {
+        let mk = key();
+        let secret = b"a 24-word BIP39 mnemonic seed lives here";
+        let sealed = seal(&mk, secret, CTX).unwrap();
+        let opened = open(&mk, &sealed, CTX).unwrap();
+        assert_eq!(opened.as_slice(), secret);
+    }
+
+    #[test]
+    fn ciphertext_is_not_plaintext() {
+        let mk = key();
+        let secret = b"super secret seed";
+        let sealed = seal(&mk, secret, CTX).unwrap();
+        assert_ne!(sealed.ciphertext.as_slice(), secret.as_slice());
+        // ciphertext carries the 16-byte GCM tag, so it is longer than the plaintext.
+        assert_eq!(sealed.ciphertext.len(), secret.len() + 16);
+    }
+
+    #[test]
+    fn two_seals_differ_nonce_and_ciphertext() {
+        let mk = key();
+        let secret = b"identical plaintext";
+        let a = seal(&mk, secret, CTX).unwrap();
+        let b = seal(&mk, secret, CTX).unwrap();
+        // Fresh random nonce + salt per call => no reuse, different ciphertext.
+        assert_ne!(a.nonce, b.nonce, "nonce must be unique per seal");
+        assert_ne!(a.salt, b.salt, "salt must be unique per seal");
+        assert_ne!(a.ciphertext, b.ciphertext, "ciphertext must differ");
+        // Both still open to the same plaintext.
+        assert_eq!(open(&mk, &a, CTX).unwrap().as_slice(), secret);
+        assert_eq!(open(&mk, &b, CTX).unwrap().as_slice(), secret);
+    }
+
+    #[test]
+    fn tampered_ciphertext_fails() {
+        let mk = key();
+        let mut sealed = seal(&mk, b"seed", CTX).unwrap();
+        sealed.ciphertext[0] ^= 0xff;
+        assert!(matches!(
+            open(&mk, &sealed, CTX),
+            Err(CryptoError::DecryptionFailed)
+        ));
+    }
+
+    #[test]
+    fn tampered_tag_fails() {
+        let mk = key();
+        let mut sealed = seal(&mk, b"seed", CTX).unwrap();
+        // The last byte is part of the GCM tag.
+        let last = sealed.ciphertext.len() - 1;
+        sealed.ciphertext[last] ^= 0x01;
+        assert!(matches!(
+            open(&mk, &sealed, CTX),
+            Err(CryptoError::DecryptionFailed)
+        ));
+    }
+
+    #[test]
+    fn tampered_nonce_fails() {
+        let mk = key();
+        let mut sealed = seal(&mk, b"seed", CTX).unwrap();
+        sealed.nonce[0] ^= 0xff;
+        assert!(matches!(
+            open(&mk, &sealed, CTX),
+            Err(CryptoError::DecryptionFailed)
+        ));
+    }
+
+    #[test]
+    fn wrong_master_key_fails() {
+        let mk = key();
+        let other = key();
+        let sealed = seal(&mk, b"seed", CTX).unwrap();
+        assert!(matches!(
+            open(&other, &sealed, CTX),
+            Err(CryptoError::DecryptionFailed)
+        ));
+    }
+
+    #[test]
+    fn wrong_context_fails() {
+        // A record sealed for mainnet must not open under testnet, even with the right key.
+        let mk = key();
+        let sealed = seal(&mk, b"seed", b"octo:mainnet").unwrap();
+        assert!(matches!(
+            open(&mk, &sealed, b"octo:testnet"),
+            Err(CryptoError::DecryptionFailed)
+        ));
+    }
+
+    #[test]
+    fn empty_plaintext_roundtrips() {
+        let mk = key();
+        let sealed = seal(&mk, b"", CTX).unwrap();
+        assert_eq!(open(&mk, &sealed, CTX).unwrap().as_slice(), b"");
+    }
+
+    #[test]
+    fn master_key_from_slice_validates_length() {
+        assert!(master_key_from_slice(&[0u8; 32]).is_ok());
+        assert!(matches!(
+            master_key_from_slice(&[0u8; 31]),
+            Err(CryptoError::InvalidKeyLength)
+        ));
+        assert!(matches!(
+            master_key_from_slice(&[0u8; 33]),
+            Err(CryptoError::InvalidKeyLength)
+        ));
+    }
+}
