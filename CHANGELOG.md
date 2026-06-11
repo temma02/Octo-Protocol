@@ -40,3 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `octo-api`: friendbot funding of new testnet accounts on wallet creation (`funded` flag), a
   `GET /v1/wallets/:id/balances` endpoint backed by a thin Horizon client, and a live testnet
   integration test (gated by `OCTO_LIVE_TESTS=1`) proving real on-chain funding + balance reads.
+- `octo-ingest`: deposit detection. Polls a master account's Horizon `/payments` (oldest-first,
+  from a persisted cursor), attributes each payment by **muxed id** or **transaction memo id**,
+  and records it idempotently. Only `successful` txs are credited; dedup is on the Horizon
+  operation id (TOID); unattributed deposits are quarantined (no `address_id`); amounts converted
+  to integer stroops without floats. Migration `0002` adds `transactions.horizon_op_id` (unique).
+  7 unit tests (amount + attribution) and 6 DB-backed `process()` tests.

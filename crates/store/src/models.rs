@@ -49,6 +49,7 @@ pub struct Transaction {
     pub destination_account: Option<String>,
     pub stellar_tx_hash: Option<String>,
     pub operation_index: Option<i32>,
+    pub horizon_op_id: Option<String>,
     pub ledger: Option<i64>,
     pub memo_id: Option<i64>,
     pub status: String,
@@ -99,6 +100,8 @@ pub struct NewDeposit {
     pub destination_account: Option<String>,
     pub stellar_tx_hash: String,
     pub operation_index: i32,
+    /// Horizon operation id (TOID) — the unique dedup key for this deposit.
+    pub horizon_op_id: String,
     pub ledger: Option<i64>,
     pub memo_id: Option<i64>,
 }

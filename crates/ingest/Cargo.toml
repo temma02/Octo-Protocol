@@ -10,10 +10,15 @@ authors.workspace = true
 
 [dependencies]
 octo-store.workspace = true
-octo-webhooks.workspace = true
+octo-wallet-core.workspace = true
 reqwest.workspace = true
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+dotenvy = "0.15"

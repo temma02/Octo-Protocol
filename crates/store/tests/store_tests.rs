@@ -115,6 +115,7 @@ async fn record_deposit_is_idempotent() {
         destination_account: Some("Gmaster".into()),
         stellar_tx_hash: tx_hash.clone(),
         operation_index: 0,
+        horizon_op_id: format!("{tx_hash}-0"),
         ledger: Some(123),
         memo_id: None,
     };
@@ -123,7 +124,7 @@ async fn record_deposit_is_idempotent() {
     let first = store.record_deposit(&dep).await.expect("first");
     assert!(first.is_some(), "first deposit must be recorded");
 
-    // Replaying the SAME (tx_hash, op_index) must NOT double-credit.
+    // Replaying the SAME horizon_op_id must NOT double-credit.
     let second = store.record_deposit(&dep).await.expect("second");
     assert!(
         second.is_none(),
@@ -150,11 +151,13 @@ async fn different_op_index_same_tx_is_distinct() {
         destination_account: None,
         stellar_tx_hash: tx_hash.clone(),
         operation_index: 0,
+        horizon_op_id: format!("{tx_hash}-0"),
         ledger: None,
         memo_id: None,
     };
     let op1 = NewDeposit {
         operation_index: 1,
+        horizon_op_id: format!("{tx_hash}-1"),
         ..base.clone()
     };
 

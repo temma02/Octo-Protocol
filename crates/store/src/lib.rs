@@ -199,9 +199,9 @@ impl Store {
             r#"
             INSERT INTO transactions
                 (wallet_id, address_id, direction, asset_code, asset_issuer, amount_stroops,
-                 source_account, destination_account, stellar_tx_hash, operation_index, ledger,
-                 memo_id, status)
-            VALUES ($1, $2, 'deposit', $3, $4, $5, $6, $7, $8, $9, $10, $11, 'confirmed')
+                 source_account, destination_account, stellar_tx_hash, operation_index,
+                 horizon_op_id, ledger, memo_id, status)
+            VALUES ($1, $2, 'deposit', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'confirmed')
             RETURNING *
             "#,
         )
@@ -214,6 +214,7 @@ impl Store {
         .bind(&d.destination_account)
         .bind(&d.stellar_tx_hash)
         .bind(d.operation_index)
+        .bind(&d.horizon_op_id)
         .bind(d.ledger)
         .bind(d.memo_id)
         .fetch_one(&self.pool)
