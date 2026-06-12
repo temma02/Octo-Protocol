@@ -100,6 +100,14 @@ impl Store {
         .map_err(StoreError::from_sqlx_conflict)
     }
 
+    /// List all wallets (used by the ingest supervisor to fan out poll loops).
+    pub async fn list_wallets(&self) -> Result<Vec<Wallet>, StoreError> {
+        let rows = sqlx::query_as::<_, Wallet>("SELECT * FROM wallets ORDER BY created_at")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows)
+    }
+
     /// Fetch a wallet by id.
     pub async fn get_wallet(&self, id: Uuid) -> Result<Wallet, StoreError> {
         sqlx::query_as::<_, Wallet>("SELECT * FROM wallets WHERE id = $1")

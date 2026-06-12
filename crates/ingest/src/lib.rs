@@ -247,6 +247,67 @@ pub enum IngestError {
     Horizon,
 }
 
+/// Supervises deposit ingestion across all wallets.
+///
+/// On each tick it loads the wallet list and polls each one once (resuming from its cursor). This
+/// is a simple, restart-safe fan-out for the MVP; it can later be split into per-wallet workers or
+/// separate processes for scale without changing the cursor-based contract.
+pub struct Supervisor {
+    store: Store,
+    horizon_url: String,
+    webhooks: WebhookSender,
+    network: &'static str,
+}
+
+impl Supervisor {
+    pub fn new(
+        store: Store,
+        horizon_url: String,
+        webhooks: WebhookSender,
+        network: &'static str,
+    ) -> Self {
+        Self {
+            store,
+            horizon_url,
+            webhooks,
+            network,
+        }
+    }
+
+    /// Run forever: every `interval`, poll all wallets on this network once.
+    pub async fn run(self, interval: Duration, page_limit: u32) {
+        loop {
+            if let Err(e) = self.tick(page_limit).await {
+                tracing::warn!(error = ?e, "ingest supervisor tick failed; will retry");
+            }
+            tokio::time::sleep(interval).await;
+        }
+    }
+
+    /// One supervision pass: poll every wallet on this network once.
+    pub async fn tick(&self, page_limit: u32) -> Result<usize, IngestError> {
+        let wallets = self.store.list_wallets().await?;
+        let mut total = 0;
+        for w in wallets {
+            if w.network != self.network {
+                continue;
+            }
+            let ingestor = Ingestor::new(
+                self.store.clone(),
+                &self.horizon_url,
+                w.id,
+                w.stellar_account_g.clone(),
+            )
+            .with_webhooks(self.webhooks.clone());
+            match ingestor.poll_once(page_limit).await {
+                Ok(n) => total += n,
+                Err(e) => tracing::warn!(wallet = %w.id, error = ?e, "wallet poll failed"),
+            }
+        }
+        Ok(total)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

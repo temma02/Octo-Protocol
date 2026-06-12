@@ -60,3 +60,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `submit_transaction`; `octo-crypto::SealedSeed::from_parts` reconstructs a sealed seed from DB
   bytes; store gains `update_withdrawal_status`. Tests: hermetic validation + idempotency-conflict,
   and a **live testnet** test that withdraws 1 XLM between two funded wallets and confirms on-chain.
+- `octo-server`: the deployable binary. Loads config from env (`.env` supported), connects +
+  migrates Postgres, then runs the REST API (axum) and a deposit **ingest supervisor** (polls
+  Horizon for all wallets on an interval, restart-safe via cursors) in one process. New
+  `octo_ingest::Supervisor` fans out per-wallet polling; store gains `list_wallets`. Verified by
+  booting the server and creating + friendbot-funding a wallet over real HTTP.

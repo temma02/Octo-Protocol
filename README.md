@@ -61,8 +61,28 @@ docker compose up -d db
 just build
 just test
 
-# 4. Run (after the API lands in later steps)
-just run
+# 4. Run the service (REST API + deposit ingest worker)
+just run            # cargo run -p octo-server  → API on $BIND_ADDR (default :8080)
+```
+
+Then, against a running server (testnet):
+
+```bash
+# Create a master wallet (friendbot-funds it on testnet)
+curl -s -X POST localhost:8080/v1/wallets | jq
+
+# Generate a customer deposit address (returns the M... and the G...+memo fallback)
+curl -s -X POST localhost:8080/v1/wallets/<WALLET_ID>/addresses | jq
+
+# Live on-chain balances
+curl -s localhost:8080/v1/wallets/<WALLET_ID>/balances | jq
+
+# Register a webhook, then withdraw (Idempotency-Key prevents double-spend)
+curl -s -X POST localhost:8080/v1/wallets/<WALLET_ID>/webhooks \
+  -H 'content-type: application/json' -d '{"url":"https://your.app/hooks"}' | jq
+curl -s -X POST localhost:8080/v1/wallets/<WALLET_ID>/withdraw \
+  -H 'content-type: application/json' -H 'Idempotency-Key: abc-123' \
+  -d '{"destination":"G...DEST","amount_stroops":10000000}' | jq
 ```
 
 ## Security architecture

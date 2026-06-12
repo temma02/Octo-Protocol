@@ -16,6 +16,11 @@ path = "src/main.rs"
 octo-api.workspace = true
 octo-ingest.workspace = true
 octo-store.workspace = true
+octo-webhooks.workspace = true
+octo-wallet-core.workspace = true
 tokio.workspace = true
 anyhow.workspace = true
-# tracing + tracing-subscriber are added when logging is wired in Step 11.
+axum.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+dotenvy = "0.15"
