@@ -74,7 +74,8 @@ impl From<octo_wallet_core::WalletError> for ApiError {
             W::InvalidMnemonic
             | W::InvalidAddress
             | W::InvalidAmount
-            | W::InvalidDerivationPath => ApiError::BadRequest("invalid input".into()),
+            | W::InvalidDerivationPath
+            | W::InvalidXdr => ApiError::BadRequest("invalid input".into()),
             W::KeyDerivation | W::Signing | W::SeedDecryption => ApiError::Internal,
         }
     }
