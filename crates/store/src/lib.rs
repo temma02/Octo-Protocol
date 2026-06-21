@@ -17,7 +17,8 @@ mod models;
 
 pub use error::StoreError;
 pub use models::{
-    Address, ApiKey, AuditLog, NewDeposit, Transaction, User, Wallet, WebhookEndpoint, Withdrawal,
+    Address, ApiKey, AuditLog, NewDeposit, SponsoredTransaction, Transaction, User, Wallet,
+    WebhookEndpoint, Withdrawal,
 };
 
 use sqlx::postgres::{PgPool, PgPoolOptions};
@@ -455,6 +456,36 @@ impl Store {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    // --- sponsored transactions -------------------------------------------
+
+    /// List sponsored transactions for a wallet (most recent first), with
+    /// optional status filter and cursor-based pagination.
+    pub async fn list_sponsored_transactions(
+        &self,
+        wallet_id: Uuid,
+        limit: i64,
+        status_filter: Option<&str>,
+        before_id: Option<Uuid>,
+    ) -> Result<Vec<SponsoredTransaction>, StoreError> {
+        let rows = sqlx::query_as::<_, SponsoredTransaction>(
+            r#"
+            SELECT * FROM sponsored_transactions
+            WHERE wallet_id = $1
+              AND ($2::text IS NULL OR status = $2)
+              AND ($3::uuid IS NULL OR (created_at, id) < (SELECT created_at, id FROM sponsored_transactions WHERE id = $3))
+            ORDER BY created_at DESC, id DESC
+            LIMIT $4
+            "#,
+        )
+        .bind(wallet_id)
+        .bind(status_filter)
+        .bind(before_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 
     // --- ingest cursor ----------------------------------------------------

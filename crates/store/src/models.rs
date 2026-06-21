@@ -123,6 +123,19 @@ pub struct ApiKey {
     pub created_at: DateTime<Utc>,
 }
 
+/// A sponsored (fee-bump) transaction record.
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct SponsoredTransaction {
+    pub id: Uuid,
+    pub wallet_id: Uuid,
+    pub inner_tx_hash: String,
+    pub fee_bump_tx_hash: String,
+    pub fee_stroops: i64,
+    pub status: String,
+    pub error: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
 /// A new deposit to record (input to the idempotent insert).
 #[derive(Debug, Clone)]
 pub struct NewDeposit {
