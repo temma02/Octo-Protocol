@@ -395,6 +395,101 @@ async fn upsert_updates_existing_config() {
 }
 
 #[tokio::test]
+async fn record_and_update_sponsored_tx() {
+    let Some(store) = store().await else { return };
+    let wallet_id = fresh_wallet(&store).await;
+    let inner = Uuid::new_v4().to_string();
+
+    let rec = store
+        .record_sponsored_tx(NewSponsoredTx {
+            wallet_id,
+            inner_tx_hash: &inner,
+            fee_bump_tx_hash: None,
+            fee_stroops: 1_000,
+        })
+        .await
+        .expect("record");
+    assert_eq!(rec.status, "pending");
+    assert_eq!(rec.fee_bump_tx_hash, None);
+
+    // Confirm it: status flips and the outer hash is set.
+    store
+        .update_sponsored_tx_status(rec.id, "confirmed", Some("feebumphash"), None)
+        .await
+        .expect("update");
+
+    let after = store
+        .sum_sponsored_fees_today(wallet_id)
+        .await
+        .expect("sum");
+    assert_eq!(after, 1_000, "confirmed fee is now counted");
+}
+
+#[tokio::test]
+async fn sum_fees_today_counts_only_confirmed() {
+    let Some(store) = store().await else { return };
+    let wallet_id = fresh_wallet(&store).await;
+
+    // A pending row — must NOT be counted.
+    store
+        .record_sponsored_tx(NewSponsoredTx {
+            wallet_id,
+            inner_tx_hash: &Uuid::new_v4().to_string(),
+            fee_bump_tx_hash: None,
+            fee_stroops: 500,
+        })
+        .await
+        .expect("pending");
+
+    // A confirmed row — must be counted.
+    let confirmed = store
+        .record_sponsored_tx(NewSponsoredTx {
+            wallet_id,
+            inner_tx_hash: &Uuid::new_v4().to_string(),
+            fee_bump_tx_hash: None,
+            fee_stroops: 750,
+        })
+        .await
+        .expect("confirmed");
+    store
+        .update_sponsored_tx_status(confirmed.id, "confirmed", Some("hash"), None)
+        .await
+        .expect("update");
+
+    let total = store
+        .sum_sponsored_fees_today(wallet_id)
+        .await
+        .expect("sum");
+    assert_eq!(total, 750, "only confirmed fees are summed");
+}
+
+#[tokio::test]
+async fn duplicate_inner_tx_hash_is_conflict() {
+    let Some(store) = store().await else { return };
+    let wallet_id = fresh_wallet(&store).await;
+    let inner = Uuid::new_v4().to_string();
+
+    let mk = || NewSponsoredTx {
+        wallet_id,
+        inner_tx_hash: &inner,
+        fee_bump_tx_hash: None,
+        fee_stroops: 100,
+    };
+
+    assert!(
+        store.record_sponsored_tx(mk()).await.is_ok(),
+        "first accepted"
+    );
+
+    // Same inner_tx_hash => conflict, not a second sponsorship.
+    let second = store.record_sponsored_tx(mk()).await;
+    assert!(
+        matches!(second, Err(StoreError::Conflict)),
+        "duplicate inner_tx_hash must conflict (anti double-sponsor)"
+    );
+}
+
+#[tokio::test]
 async fn cursor_roundtrip() {
     let Some(store) = store().await else { return };
     let wallet_id = fresh_wallet(&store).await;
