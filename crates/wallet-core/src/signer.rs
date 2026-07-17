@@ -11,6 +11,7 @@
 //!   are zeroized on drop.
 
 use crate::address::is_valid_account;
+use crate::asset::is_valid_asset_code;
 use crate::derive::WalletSeed;
 use crate::error::WalletError;
 use octo_crypto::{open, SealedSeed, MASTER_KEY_LEN};
@@ -141,12 +142,15 @@ pub fn sign_payment(
     let asset = match req.asset {
         None => Asset::new_native(),
         Some((code, issuer)) => {
+            if !is_valid_asset_code(code) {
+                return Err(WalletError::InvalidAssetCode);
+            }
             if !is_valid_account(issuer) {
                 return Err(WalletError::InvalidAddress);
             }
             let issuer_pk =
                 PublicKey::from_account_id(issuer).map_err(|_| WalletError::InvalidAddress)?;
-            Asset::new_credit(code, issuer_pk).map_err(|_| WalletError::InvalidAddress)?
+            Asset::new_credit(code, issuer_pk).map_err(|_| WalletError::InvalidAssetCode)?
         }
     };
 
@@ -418,6 +422,42 @@ mod tests {
         ));
     }
 
+    /// Regression coverage for `sign_payment`'s use of the shared
+    /// `crate::asset::is_valid_asset_code` (see `crate::asset`): an out-of-bounds credit-asset
+    /// code must be rejected as `InvalidAssetCode` before any `Asset::new_credit` call, and a
+    /// well-formed 1-12 byte code must still sign successfully.
+    #[test]
+    fn credit_payment_asset_code_goes_through_shared_validator() {
+        let (mk, sealed) = sealed_vector_seed(StellarNetwork::Testnet);
+
+        for bad in ["", "THIRTEEN_BYTE"] {
+            let req = PaymentRequest {
+                destination: DEST,
+                stroops: 1,
+                asset: Some((bad, MASTER_ACCOUNT_0)),
+                memo_id: None,
+                sequence: 1,
+            };
+            assert!(
+                matches!(
+                    sign_payment(&mk, &sealed, StellarNetwork::Testnet, 0, &req),
+                    Err(WalletError::InvalidAssetCode)
+                ),
+                "code {bad:?} (len {}) must be rejected as InvalidAssetCode",
+                bad.len()
+            );
+        }
+
+        let req = PaymentRequest {
+            destination: DEST,
+            stroops: 1,
+            asset: Some(("USDC", MASTER_ACCOUNT_0)),
+            memo_id: None,
+            sequence: 1,
+        };
+        assert!(sign_payment(&mk, &sealed, StellarNetwork::Testnet, 0, &req).is_ok());
+    }
+
     #[test]
     fn wrong_network_context_cannot_open_seed() {
         // Seed sealed for mainnet; signing as testnet must fail to decrypt (AAD/context mismatch).
@@ -590,7 +630,7 @@ mod tests {
             &sealed,
             StellarNetwork::Testnet,
             0,
-            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200, sequence: 0 },
+            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200 },
         )
         .unwrap();
 
@@ -631,7 +671,7 @@ mod tests {
             &sealed,
             StellarNetwork::Testnet,
             0,
-            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200, sequence: 0 },
+            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200 },
         )
         .unwrap();
 
@@ -658,7 +698,7 @@ mod tests {
             &sealed,
             StellarNetwork::Testnet,
             0,
-            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200, sequence: 0 },
+            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200 },
         )
         .unwrap();
 
@@ -682,7 +722,7 @@ mod tests {
                 &sealed,
                 StellarNetwork::Testnet,
                 0,
-                &FeeBumpRequest { inner_xdr: "", max_base_fee_stroops: 200, sequence: 0 },
+                &FeeBumpRequest { inner_xdr: "", max_base_fee_stroops: 200 },
             ),
             Err(WalletError::InvalidXdr)
         ));
@@ -701,7 +741,7 @@ mod tests {
             &sealed,
             StellarNetwork::Testnet,
             0,
-            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200, sequence: 0 },
+            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200 },
         )
         .unwrap()
         .envelope_xdr;
@@ -713,7 +753,7 @@ mod tests {
                 &sealed,
                 StellarNetwork::Testnet,
                 0,
-                &FeeBumpRequest { inner_xdr: &fee_bump_xdr, max_base_fee_stroops: 200, sequence: 0 },
+                &FeeBumpRequest { inner_xdr: &fee_bump_xdr, max_base_fee_stroops: 200 },
             ),
             Err(WalletError::InvalidXdr)
         ));
@@ -731,7 +771,7 @@ mod tests {
                 &mainnet_sealed,
                 StellarNetwork::Testnet,
                 0,
-                &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200, sequence: 0 },
+                &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200 },
             ),
             Err(WalletError::SeedDecryption)
         ));
@@ -750,7 +790,7 @@ mod tests {
             &sealed,
             StellarNetwork::Testnet,
             0,
-            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: max_base_fee, sequence: 0 },
+            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: max_base_fee },
         )
         .unwrap();
 
@@ -776,7 +816,7 @@ mod tests {
             &sealed,
             StellarNetwork::Testnet,
             0,
-            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200, sequence: 0 },
+            &FeeBumpRequest { inner_xdr: &inner_xdr, max_base_fee_stroops: 200 },
         );
         assert!(result.is_ok());
         assert_eq!(result.unwrap().source_account, MASTER_ACCOUNT_0);

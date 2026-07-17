@@ -368,6 +368,59 @@ async fn withdraw_duplicate_idempotency_key_conflicts_before_signing() {
     );
 }
 
+/// Regression coverage for the withdrawal route's use of the shared
+/// `octo_wallet_core::is_valid_asset_code` (see `crates/wallet-core/src/asset.rs`): an
+/// out-of-bounds asset code (0 or 13+ bytes) must be rejected with 400 *before* a withdrawal row
+/// is ever created, not merely fail later at signing.
+#[tokio::test]
+async fn withdraw_rejects_invalid_asset_code_before_creating_withdrawal_row() {
+    let Some(state) = test_state().await else {
+        return;
+    };
+    let app = build_router(state.clone());
+    let token = auth_token(&app).await;
+    let resp = app
+        .clone()
+        .oneshot(post_auth("/v1/wallets", &token))
+        .await
+        .unwrap();
+    let wallet_id = body_json(resp).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let uri = format!("/v1/wallets/{wallet_id}/withdraw");
+
+    for (label, code) in [("empty", ""), ("13_bytes", "ABCDEFGHIJKLM")] {
+        let key = format!("key-{}", uuid::Uuid::new_v4());
+        let body = format!(
+            r#"{{"destination":"GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6","amount_stroops":100,"idempotency_key":"{key}","asset":{{"code":"{code}","issuer":"GDRXE2BQUC3AZNPVFSCEZ76NJ3WWL25FYFK6RGZGIEKWE4SOOHSUJUJ6"}}}}"#
+        );
+        let resp = app
+            .clone()
+            .oneshot(post_json_auth(&uri, &body, &token))
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::BAD_REQUEST,
+            "asset code case '{label}' must be rejected"
+        );
+
+        // Prove rejection happened before create_withdrawal: no row with this idempotency key.
+        let count: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM withdrawals WHERE idempotency_key = $1",
+        )
+        .bind(&key)
+        .fetch_one(state.store().pool())
+        .await
+        .unwrap();
+        assert_eq!(
+            count, 0,
+            "case '{label}': invalid asset code must not create a withdrawal row"
+        );
+    }
+}
+
 #[tokio::test]
 async fn api_key_generate_and_get() {
     let Some(state) = test_state().await else {
