@@ -367,3 +367,55 @@ async fn upsert_gas_sponsorship_config_works() {
         .expect("sum");
     assert_eq!(spent, 0);
 }
+
+/// `allocate_address` claims to be safe under concurrent callers via a `SELECT ... FOR UPDATE`
+/// row lock inside a transaction. `allocate_address_increments_atomically` above only calls it
+/// sequentially, which never actually exercises that lock. This spawns real concurrent tasks
+/// against the same wallet and proves the row lock serializes the counter bump: every returned
+/// muxed id is unique, and the full set is exactly {1, ..., N} with no gaps or collisions.
+#[tokio::test]
+async fn allocate_address_is_collision_free_under_concurrency() {
+    let Some(store) = store().await else { return };
+    let wallet_id = fresh_wallet(&store).await;
+    let wid = wallet_id.simple();
+
+    const N: usize = 25;
+
+    let handles: Vec<tokio::task::JoinHandle<i64>> = (0..N)
+        .map(|i| {
+            let store = store.clone();
+            tokio::spawn(async move {
+                let address = store
+                    .allocate_address(
+                        wallet_id,
+                        |id| Ok(format!("M{wid}-{id}")),
+                        Some(&format!("concurrent-{i}")),
+                        serde_json::json!({}),
+                    )
+                    .await
+                    .expect("allocate_address under concurrency");
+                address.muxed_id
+            })
+        })
+        .collect();
+
+    let mut muxed_ids = Vec::with_capacity(N);
+    for handle in handles {
+        muxed_ids.push(handle.await.expect("task panicked"));
+    }
+
+    let unique: std::collections::BTreeSet<i64> = muxed_ids.iter().copied().collect();
+    assert_eq!(
+        unique.len(),
+        N,
+        "expected {N} unique muxed ids, got {} unique out of {:?}",
+        unique.len(),
+        muxed_ids
+    );
+
+    let expected: std::collections::BTreeSet<i64> = (1..=N as i64).collect();
+    assert_eq!(
+        unique, expected,
+        "muxed ids must be exactly {{1, ..., {N}}} with no gaps"
+    );
+}
