@@ -367,3 +367,127 @@ async fn upsert_gas_sponsorship_config_works() {
         .expect("sum");
     assert_eq!(spent, 0);
 }
+
+/// Every child table in `crates/store/migrations/0001_init.sql` and later migrations
+/// (`addresses`, `transactions`, `withdrawals`, `webhook_endpoints`, `gas_sponsorship_configs`,
+/// `sponsored_transactions`) declares `REFERENCES wallets(id) ON DELETE CASCADE`, but nothing
+/// previously exercised that behavior — a migration typo (e.g. `ON DELETE SET NULL` instead of
+/// `CASCADE`) would go unnoticed. This populates one row per child table and confirms they are
+/// all removed when the parent wallet row is deleted.
+#[tokio::test]
+async fn deleting_wallet_cascades_to_all_child_tables() {
+    let Some(store) = store().await else { return };
+    let wallet_id = fresh_wallet(&store).await;
+    let wid = wallet_id.simple();
+
+    // addresses
+    store
+        .allocate_address(
+            wallet_id,
+            |id| Ok(format!("M{wid}-{id}")),
+            Some("cascade-test"),
+            serde_json::json!({}),
+        )
+        .await
+        .expect("allocate address");
+
+    // transactions (deposit)
+    let tx_hash = format!("cascade-{wid}");
+    store
+        .record_deposit(&NewDeposit {
+            wallet_id,
+            address_id: None,
+            asset_code: "native".into(),
+            asset_issuer: None,
+            amount_stroops: 1_000,
+            source_account: Some("Gsender".into()),
+            destination_account: Some("Gmaster".into()),
+            stellar_tx_hash: tx_hash.clone(),
+            operation_index: 0,
+            horizon_op_id: format!("{tx_hash}-0"),
+            ledger: Some(1),
+            memo_id: None,
+        })
+        .await
+        .expect("record deposit");
+
+    // withdrawals
+    store
+        .create_withdrawal(NewWithdrawal {
+            wallet_id,
+            idempotency_key: "cascade-key",
+            destination_account: "Gdest",
+            asset_code: "native",
+            asset_issuer: None,
+            amount_stroops: 500,
+            memo_id: None,
+        })
+        .await
+        .expect("create withdrawal");
+
+    // webhook_endpoints
+    store
+        .create_webhook_endpoint(wallet_id, "https://example.com/hook", "secret")
+        .await
+        .expect("create webhook endpoint");
+
+    // gas_sponsorship_configs
+    insert_sponsorship_config(&store, wallet_id).await;
+
+    // sponsored_transactions (requires a gas_sponsorship_configs row to exist first)
+    store
+        .record_sponsored_tx(NewSponsoredTx {
+            wallet_id,
+            inner_tx_hash: &format!("cascade-inner-{wid}"),
+            fee_stroops: 100,
+        })
+        .await
+        .expect("record sponsored tx");
+
+    // Sanity check: every child row exists before the delete.
+    for table in [
+        "addresses",
+        "transactions",
+        "withdrawals",
+        "webhook_endpoints",
+        "gas_sponsorship_configs",
+        "sponsored_transactions",
+    ] {
+        let count: i64 = sqlx::query_scalar(&format!(
+            "SELECT count(*) FROM {table} WHERE wallet_id = $1"
+        ))
+        .bind(wallet_id)
+        .fetch_one(store.pool())
+        .await
+        .unwrap_or_else(|e| panic!("count {table} before delete: {e}"));
+        assert_eq!(count, 1, "expected exactly one {table} row before delete");
+    }
+
+    // Delete the wallet directly (no Store::delete_wallet method exists yet).
+    sqlx::query("DELETE FROM wallets WHERE id = $1")
+        .bind(wallet_id)
+        .execute(store.pool())
+        .await
+        .expect("delete wallet");
+
+    for table in [
+        "addresses",
+        "transactions",
+        "withdrawals",
+        "webhook_endpoints",
+        "gas_sponsorship_configs",
+        "sponsored_transactions",
+    ] {
+        let count: i64 = sqlx::query_scalar(&format!(
+            "SELECT count(*) FROM {table} WHERE wallet_id = $1"
+        ))
+        .bind(wallet_id)
+        .fetch_one(store.pool())
+        .await
+        .unwrap_or_else(|e| panic!("count {table} after delete: {e}"));
+        assert_eq!(
+            count, 0,
+            "expected {table} rows to be cascade-deleted with the wallet"
+        );
+    }
+}
